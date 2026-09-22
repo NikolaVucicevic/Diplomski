@@ -1,0 +1,27 @@
+services:
+
+  order-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: order_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - order_data:/var/lib/postgresql/data
+
+  inventory-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - inventory_data:/var/lib/postgresql/data
+
+volumes:
+  order_data:
+  inventory_data:
