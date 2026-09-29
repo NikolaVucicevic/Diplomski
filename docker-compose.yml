@@ -1,7 +1,7 @@
 services:
 
   order-db:
-    image: postgres:17
+    image: postgres:17-bookworm
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -12,7 +12,7 @@ services:
       - order_data:/var/lib/postgresql/data
 
   inventory-db:
-    image: postgres:17
+    image: postgres:17-bookworm
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -23,7 +23,7 @@ services:
       - inventory_data:/var/lib/postgresql/data
 
   payment-db:
-    image: postgres:17
+    image: postgres:17-bookworm
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
