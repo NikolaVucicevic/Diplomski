@@ -21,6 +21,7 @@ def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db)
 ):
+    # 1. Kreiramo order
     new_order = models.Order(
         product_id=order.product_id,
         quantity=order.quantity,
@@ -32,7 +33,8 @@ def create_order(
     db.commit()
     db.refresh(new_order)
 
-    response = httpx.post(
+    # 2. Pozivamo Inventory Service
+    inventory_response = httpx.post(
         "http://localhost:8002/reserve",
         json={
             "product_id": order.product_id,
@@ -40,10 +42,35 @@ def create_order(
         }
     )
 
-    if response.status_code == 200:
-        new_order.status = "RESERVED"
+    # Ako rezervacija nije uspela
+    if inventory_response.status_code != 200:
+        new_order.status = "FAILED"
         db.commit()
         db.refresh(new_order)
+        return new_order
+
+    # Rezervacija uspela
+    new_order.status = "RESERVED"
+    db.commit()
+    db.refresh(new_order)
+
+    # 3. Pozivamo Payment Service
+    payment_response = httpx.post(
+        "http://localhost:8003/pay",
+        json={
+            "order_id": new_order.id,
+            "amount": order.price * order.quantity
+        }
+    )
+
+    # 4. Proveravamo rezultat plaćanja
+    if payment_response.status_code == 200:
+        new_order.status = "PAID"
+    else:
+        new_order.status = "PAYMENT_FAILED"
+
+    db.commit()
+    db.refresh(new_order)
 
     return new_order
 
