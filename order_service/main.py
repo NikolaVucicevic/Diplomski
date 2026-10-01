@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
+import httpx
 
 from .database import engine, get_db
 from . import models, schemas
@@ -30,6 +31,19 @@ def create_order(
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
+
+    response = httpx.post(
+        "http://localhost:8002/reserve",
+        json={
+            "product_id": order.product_id,
+            "quantity": order.quantity
+        }
+    )
+
+    if response.status_code == 200:
+        new_order.status = "RESERVED"
+        db.commit()
+        db.refresh(new_order)
 
     return new_order
 

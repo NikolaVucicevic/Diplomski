@@ -15,7 +15,7 @@ def root():
     return {"message": "Payment Service radi"}
 
 
-@app.post("/payments", response_model=schemas.PaymentResponse)
+@app.post("/pay", response_model=schemas.PaymentResponse)
 def create_payment(
     payment: schemas.PaymentCreate,
     db: Session = Depends(get_db)
