@@ -6,6 +6,10 @@ class OrderCreate(BaseModel):
     quantity: int
     price: float
 
+class OrderUpdate(BaseModel):
+    id: int
+    status: str
+
 
 class OrderResponse(BaseModel):
     id: int
