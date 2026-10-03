@@ -60,3 +60,25 @@ def update_order_status(
     db.refresh(order)
 
     return order
+
+@app.post("/cancel", response_model=schemas.OrderResponse)
+def cancel_order(
+    request: schemas.CancelOrderRequest,
+    db: Session = Depends(get_db)
+):
+    order = db.query(models.Order).filter(
+        models.Order.id == request.order_id
+    ).first()
+
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
+    order.status = "CANCELLED"
+
+    db.commit()
+    db.refresh(order)
+
+    return order

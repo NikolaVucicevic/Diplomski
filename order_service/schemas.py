@@ -18,6 +18,9 @@ class OrderResponse(BaseModel):
     price: float
     status: str
 
+class CancelOrderRequest(BaseModel):
+    order_id: int
+
     model_config = {
         "from_attributes": True
     }

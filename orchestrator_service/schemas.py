@@ -5,3 +5,4 @@ class OrderSagaRequest(BaseModel):
     product_id: int
     quantity: int
     price: float
+    account_id: int

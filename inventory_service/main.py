@@ -68,3 +68,29 @@ def reserve_product(
         "product_id": product.id,
         "remaining_quantity": product.quantity
     }
+
+@app.post("/release")
+def release_product(
+    request: schemas.ReserveRequest,
+    db: Session = Depends(get_db)
+):
+    product = db.query(models.Product).filter(
+        models.Product.id == request.product_id
+    ).first()
+
+    if product is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    product.quantity += request.quantity
+
+    db.commit()
+    db.refresh(product)
+
+    return {
+        "message": "Product released",
+        "product_id": product.id,
+        "quantity": product.quantity
+    }

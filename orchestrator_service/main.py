@@ -11,7 +11,6 @@ def root():
     return {"message": "Saga Orchestrator Service radi"}
 
 
-
 @app.post("/saga")
 def start_saga(request: schemas.OrderSagaRequest):
 
@@ -25,7 +24,7 @@ def start_saga(request: schemas.OrderSagaRequest):
         }
     )
 
-    if order_response.status_code != 200:
+    if not order_response.is_success:
         raise HTTPException(
             status_code=400,
             detail="Order creation failed"
@@ -43,7 +42,16 @@ def start_saga(request: schemas.OrderSagaRequest):
         }
     )
 
-    if inventory_response.status_code != 200:
+    if not inventory_response.is_success:
+
+        # Kompenzacija za create order
+        httpx.post(
+            "http://localhost:8001/cancel",
+            json={
+                "order_id": order_id
+            }
+        )
+
         raise HTTPException(
             status_code=400,
             detail="Inventory reservation failed"
@@ -54,18 +62,37 @@ def start_saga(request: schemas.OrderSagaRequest):
         "http://localhost:8003/pay",
         json={
             "order_id": order_id,
+            "account_id": request.account_id,
             "amount": request.price * request.quantity
         }
     )
 
-    if payment_response.status_code != 200:
+    if not payment_response.is_success:
+
+        # Kompenzacija za reserve
+        httpx.post(
+            "http://localhost:8002/release",
+            json={
+                "product_id": request.product_id,
+                "quantity": request.quantity
+            }
+        )
+
+        # Kompenzacija za create order
+        httpx.post(
+            "http://localhost:8001/cancel",
+            json={
+                "order_id": order_id
+            }
+        )
+
         raise HTTPException(
             status_code=400,
             detail="Payment failed"
         )
 
     # 4. Promeni status ordera na PAID
-    httpx.put(
+    status_response = httpx.put(
         "http://localhost:8001/orders/status",
         json={
             "id": order_id,
