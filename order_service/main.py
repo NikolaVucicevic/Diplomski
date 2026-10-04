@@ -16,12 +16,23 @@ def root():
     return {"message": "Order Service radi"}
 
 
-@app.post("/orders", response_model=schemas.OrderResponse)
+@app.post("/create", response_model=schemas.OrderResponse)
 def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db)
 ):
+    # Proveri da li je ova Saga vec kreirala order
+    existing_order = db.query(models.Order).filter(
+        models.Order.saga_id == order.saga_id
+    ).first()
+
+    # Ako jeste, samo vrati postojeci order
+    if existing_order:
+        return existing_order
+
+    # Ako nije, kreiraj novi order
     new_order = models.Order(
+        saga_id=order.saga_id,
         product_id=order.product_id,
         quantity=order.quantity,
         price=order.price,

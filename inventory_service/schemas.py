@@ -17,5 +17,10 @@ class ProductResponse(BaseModel):
 
 
 class ReserveRequest(BaseModel):
+    saga_id: int
     product_id: int
     quantity: int
+
+
+class ReleaseRequest(BaseModel):
+    saga_id: int

@@ -31,6 +31,7 @@ def create_account(
 
     return new_account
 
+
 @app.get("/accounts/{account_id}", response_model=schemas.AccountResponse)
 def get_account(
     account_id: int,
@@ -54,6 +55,15 @@ def create_payment(
     payment: schemas.PaymentCreate,
     db: Session = Depends(get_db)
 ):
+    # Proveri da li je ova Saga vec izvrsila placanje
+    existing_payment = db.query(models.Payment).filter(
+        models.Payment.saga_id == payment.saga_id
+    ).first()
+
+    # Ako jeste, ne skidaj novac ponovo
+    if existing_payment:
+        return existing_payment
+
     account = db.query(models.Account).filter(
         models.Account.id == payment.account_id
     ).first()
@@ -70,9 +80,12 @@ def create_payment(
             detail="Insufficient funds"
         )
 
+    # Skini novac
     account.balance -= payment.amount
 
+    # Zapamti da je ova Saga izvrsila placanje
     new_payment = models.Payment(
+        saga_id=payment.saga_id,
         order_id=payment.order_id,
         account_id=payment.account_id,
         amount=payment.amount,
@@ -96,8 +109,9 @@ def refund_payment(
     request: schemas.PaymentRefund,
     db: Session = Depends(get_db)
 ):
+    # Pronadji payment preko saga_id
     payment = db.query(models.Payment).filter(
-        models.Payment.id == request.payment_id
+        models.Payment.saga_id == request.saga_id
     ).first()
 
     if payment is None:
@@ -106,11 +120,9 @@ def refund_payment(
             detail="Payment not found"
         )
 
-    if payment.status != "COMPLETED":
-        raise HTTPException(
-            status_code=400,
-            detail="Payment cannot be refunded"
-        )
+    # Ako je vec refundiran, samo vrati isti payment
+    if payment.status == "REFUNDED":
+        return payment
 
     account = db.query(models.Account).filter(
         models.Account.id == payment.account_id
@@ -122,7 +134,10 @@ def refund_payment(
             detail="Account not found"
         )
 
+    # Vrati novac
     account.balance += payment.amount
+
+    # Oznaci payment kao refundiran
     payment.status = "REFUNDED"
 
     db.commit()

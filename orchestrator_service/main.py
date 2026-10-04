@@ -15,6 +15,10 @@ app = FastAPI(title="Saga Orchestrator Service")
 def root():
     return {"message": "Saga Orchestrator Service radi"}
 
+@app.get("/sagas")
+def get_sagas(db: Session = Depends(get_db)):
+    sagas = db.query(models.Saga).all()
+    return sagas
 
 @app.post("/saga")
 def start_saga(
@@ -36,8 +40,9 @@ def start_saga(
 
     # 1. Kreiraj order
     order_response = httpx.post(
-        "http://localhost:8001/orders",
+        "http://localhost:8001/create",
         json={
+            "saga_id": saga_id,
             "product_id": request.product_id,
             "quantity": request.quantity,
             "price": request.price
@@ -67,6 +72,7 @@ def start_saga(
     inventory_response = httpx.post(
         "http://localhost:8002/reserve",
         json={
+            "saga_id": saga_id,
             "product_id": request.product_id,
             "quantity": request.quantity
         }
@@ -79,12 +85,22 @@ def start_saga(
         db.commit()
 
         # Kompenzacija za create order
-        httpx.post(
+        cancel_response = httpx.post(
             "http://localhost:8001/cancel",
             json={
                 "order_id": order_id
             }
         )
+
+        if not cancel_response.is_success:
+            saga.status = "COMPENSATION_FAILED"
+            saga.current_step = "ORDER_CANCEL_FAILED"
+            db.commit()
+
+            raise HTTPException(
+                status_code=500,
+                detail="Inventory reservation failed and order compensation failed"
+            )
 
         saga.status = "COMPENSATED"
         saga.current_step = "ORDER_CANCELLED"
@@ -102,6 +118,7 @@ def start_saga(
     payment_response = httpx.post(
         "http://localhost:8003/pay",
         json={
+            "saga_id": saga_id,
             "order_id": order_id,
             "account_id": request.account_id,
             "amount": request.price * request.quantity
@@ -115,24 +132,43 @@ def start_saga(
         db.commit()
 
         # Kompenzacija za reserve
-        httpx.post(
+        release_response = httpx.post(
             "http://localhost:8002/release",
             json={
-                "product_id": request.product_id,
-                "quantity": request.quantity
+                "saga_id": saga_id
             }
         )
+
+        if not release_response.is_success:
+            saga.status = "COMPENSATION_FAILED"
+            saga.current_step = "INVENTORY_RELEASE_FAILED"
+            db.commit()
+
+            raise HTTPException(
+                status_code=500,
+                detail="Payment failed and inventory compensation failed"
+            )
 
         saga.current_step = "CANCELLING_ORDER"
         db.commit()
 
         # Kompenzacija za create order
-        httpx.post(
+        cancel_response = httpx.post(
             "http://localhost:8001/cancel",
             json={
                 "order_id": order_id
             }
         )
+
+        if not cancel_response.is_success:
+            saga.status = "COMPENSATION_FAILED"
+            saga.current_step = "ORDER_CANCEL_FAILED"
+            db.commit()
+
+            raise HTTPException(
+                status_code=500,
+                detail="Payment failed and order compensation failed"
+            )
 
         saga.status = "COMPENSATED"
         saga.current_step = "COMPENSATED"
@@ -156,8 +192,73 @@ def start_saga(
     )
 
     if not status_response.is_success:
-        saga.status = "FAILED"
-        saga.current_step = "ORDER_STATUS_UPDATE_FAILED"
+
+        saga.status = "COMPENSATING"
+        saga.current_step = "REFUNDING_PAYMENT"
+        db.commit()
+
+        # Kompenzacija za payment
+        refund_response = httpx.post(
+            "http://localhost:8003/refund",
+            json={
+                "saga_id": saga_id
+            }
+        )
+
+        if not refund_response.is_success:
+            saga.status = "COMPENSATION_FAILED"
+            saga.current_step = "PAYMENT_REFUND_FAILED"
+            db.commit()
+
+            raise HTTPException(
+                status_code=500,
+                detail="Order status update failed and payment compensation failed"
+            )
+
+        saga.current_step = "RELEASING_INVENTORY"
+        db.commit()
+
+        # Kompenzacija za reserve
+        release_response = httpx.post(
+            "http://localhost:8002/release",
+            json={
+                "saga_id": saga_id
+            }
+        )
+
+        if not release_response.is_success:
+            saga.status = "COMPENSATION_FAILED"
+            saga.current_step = "INVENTORY_RELEASE_FAILED"
+            db.commit()
+
+            raise HTTPException(
+                status_code=500,
+                detail="Order status update failed and inventory compensation failed"
+            )
+
+        saga.current_step = "CANCELLING_ORDER"
+        db.commit()
+
+        # Kompenzacija za create order
+        cancel_response = httpx.post(
+            "http://localhost:8001/cancel",
+            json={
+                "order_id": order_id
+            }
+        )
+
+        if not cancel_response.is_success:
+            saga.status = "COMPENSATION_FAILED"
+            saga.current_step = "ORDER_CANCEL_FAILED"
+            db.commit()
+
+            raise HTTPException(
+                status_code=500,
+                detail="Order status update failed and order compensation failed"
+            )
+
+        saga.status = "COMPENSATED"
+        saga.current_step = "COMPENSATED"
         db.commit()
 
         raise HTTPException(
@@ -165,7 +266,7 @@ def start_saga(
             detail="Order status update failed"
         )
 
-    # Saga je uspesno zavrsena
+    # 5. Saga je uspesno zavrsena
     saga.status = "COMPLETED"
     saga.current_step = "COMPLETED"
     db.commit()

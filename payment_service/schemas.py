@@ -17,6 +17,7 @@ class AccountResponse(BaseModel):
 
 
 class PaymentCreate(BaseModel):
+    saga_id: int
     order_id: int
     account_id: int
     amount: float
@@ -24,6 +25,7 @@ class PaymentCreate(BaseModel):
 
 class PaymentResponse(BaseModel):
     id: int
+    saga_id: int
     order_id: int
     account_id: int
     amount: float
@@ -35,4 +37,4 @@ class PaymentResponse(BaseModel):
 
 
 class PaymentRefund(BaseModel):
-    payment_id: int
+    saga_id: int
