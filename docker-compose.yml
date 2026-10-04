@@ -32,10 +32,21 @@ services:
       - "5434:5432"
     volumes:
       - payment_data:/var/lib/postgresql/data
+  saga-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: saga_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - saga_data:/var/lib/postgresql/data
 
 
 volumes:
   order_data:
   inventory_data:
   payment_data:
+  saga_data:
 
