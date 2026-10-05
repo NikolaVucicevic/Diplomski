@@ -55,12 +55,10 @@ def create_payment(
     payment: schemas.PaymentCreate,
     db: Session = Depends(get_db)
 ):
-    # Proveri da li je ova Saga vec izvrsila placanje
     existing_payment = db.query(models.Payment).filter(
         models.Payment.saga_id == payment.saga_id
     ).first()
 
-    # Ako jeste, ne skidaj novac ponovo
     if existing_payment:
         return existing_payment
 
@@ -109,7 +107,6 @@ def refund_payment(
     request: schemas.PaymentRefund,
     db: Session = Depends(get_db)
 ):
-    # Pronadji payment preko saga_id
     payment = db.query(models.Payment).filter(
         models.Payment.saga_id == request.saga_id
     ).first()
@@ -120,7 +117,6 @@ def refund_payment(
             detail="Payment not found"
         )
 
-    # Ako je vec refundiran, samo vrati isti payment
     if payment.status == "REFUNDED":
         return payment
 
@@ -134,10 +130,8 @@ def refund_payment(
             detail="Account not found"
         )
 
-    # Vrati novac
     account.balance += payment.amount
 
-    # Oznaci payment kao refundiran
     payment.status = "REFUNDED"
 
     db.commit()

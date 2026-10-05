@@ -26,7 +26,7 @@ def start_saga(
     db: Session = Depends(get_db)
 ):
 
-    # 0. Kreiraj Sagu
+    # 0. Kreiramo Sagu
     saga = models.Saga(
         status="STARTED",
         current_step="STARTED"
@@ -38,7 +38,7 @@ def start_saga(
 
     saga_id = saga.id
 
-    # 1. Kreiraj order
+    # 1. Kreiramo order
     order_response = httpx.post(
         "http://localhost:8001/create",
         json={
@@ -62,13 +62,13 @@ def start_saga(
     order = order_response.json()
     order_id = order["id"]
 
-    # Sacuvaj order_id i trenutno stanje Sage
+    # Sacuvamo order_id i trenutno stanje Sage
     saga.order_id = order_id
     saga.status = "IN_PROGRESS"
     saga.current_step = "ORDER_CREATED"
     db.commit()
 
-    # 2. Rezervisi proizvod
+    # 2. Rezervisemo proizvod
     inventory_response = httpx.post(
         "http://localhost:8002/reserve",
         json={
@@ -114,7 +114,7 @@ def start_saga(
     saga.current_step = "INVENTORY_RESERVED"
     db.commit()
 
-    # 3. Izvrsi placanje
+    # 3. Izvrsavamo placanje
     payment_response = httpx.post(
         "http://localhost:8003/pay",
         json={
@@ -182,7 +182,7 @@ def start_saga(
     saga.current_step = "PAYMENT_COMPLETED"
     db.commit()
 
-    # 4. Promeni status ordera na PAID
+    # 4. Menjamo status ordera na PAID
     status_response = httpx.put(
         "http://localhost:8001/orders/status",
         json={
