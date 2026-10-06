@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
-import httpx
 
 from . import schemas, models
 from .database import engine, get_db
+from .http_client import post_with_retry, put_with_retry
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -15,10 +15,12 @@ app = FastAPI(title="Saga Orchestrator Service")
 def root():
     return {"message": "Saga Orchestrator Service radi"}
 
+
 @app.get("/sagas")
 def get_sagas(db: Session = Depends(get_db)):
     sagas = db.query(models.Saga).all()
     return sagas
+
 
 @app.post("/saga")
 def start_saga(
@@ -39,7 +41,7 @@ def start_saga(
     saga_id = saga.id
 
     # 1. Kreiramo order
-    order_response = httpx.post(
+    order_response = post_with_retry(
         "http://localhost:8001/create",
         json={
             "saga_id": saga_id,
@@ -69,7 +71,7 @@ def start_saga(
     db.commit()
 
     # 2. Rezervisemo proizvod
-    inventory_response = httpx.post(
+    inventory_response = post_with_retry(
         "http://localhost:8002/reserve",
         json={
             "saga_id": saga_id,
@@ -85,7 +87,7 @@ def start_saga(
         db.commit()
 
         # Kompenzacija za create order
-        cancel_response = httpx.post(
+        cancel_response = post_with_retry(
             "http://localhost:8001/cancel",
             json={
                 "order_id": order_id
@@ -115,7 +117,7 @@ def start_saga(
     db.commit()
 
     # 3. Izvrsavamo placanje
-    payment_response = httpx.post(
+    payment_response = post_with_retry(
         "http://localhost:8003/pay",
         json={
             "saga_id": saga_id,
@@ -132,7 +134,7 @@ def start_saga(
         db.commit()
 
         # Kompenzacija za reserve
-        release_response = httpx.post(
+        release_response = post_with_retry(
             "http://localhost:8002/release",
             json={
                 "saga_id": saga_id
@@ -153,7 +155,7 @@ def start_saga(
         db.commit()
 
         # Kompenzacija za create order
-        cancel_response = httpx.post(
+        cancel_response = post_with_retry(
             "http://localhost:8001/cancel",
             json={
                 "order_id": order_id
@@ -183,7 +185,7 @@ def start_saga(
     db.commit()
 
     # 4. Menjamo status ordera na PAID
-    status_response = httpx.put(
+    status_response = put_with_retry(
         "http://localhost:8001/orders/status",
         json={
             "id": order_id,
@@ -198,7 +200,7 @@ def start_saga(
         db.commit()
 
         # Kompenzacija za payment
-        refund_response = httpx.post(
+        refund_response = post_with_retry(
             "http://localhost:8003/refund",
             json={
                 "saga_id": saga_id
@@ -219,7 +221,7 @@ def start_saga(
         db.commit()
 
         # Kompenzacija za reserve
-        release_response = httpx.post(
+        release_response = post_with_retry(
             "http://localhost:8002/release",
             json={
                 "saga_id": saga_id
@@ -240,7 +242,7 @@ def start_saga(
         db.commit()
 
         # Kompenzacija za create order
-        cancel_response = httpx.post(
+        cancel_response = post_with_retry(
             "http://localhost:8001/cancel",
             json={
                 "order_id": order_id
