@@ -73,14 +73,14 @@ def test_saga_success(monkeypatch):
             return FakeResponse(200)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "put",
+        orchestrator_main,
+        "put_with_retry",
         fake_put
     )
 
@@ -117,8 +117,8 @@ def test_order_creation_failure(monkeypatch):
             return FakeResponse(500)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
@@ -164,8 +164,8 @@ def test_inventory_failure(monkeypatch):
             return FakeResponse(200)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
@@ -218,8 +218,8 @@ def test_payment_failure(monkeypatch):
             return FakeResponse(200)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
@@ -291,14 +291,14 @@ def test_status_update_failure(monkeypatch):
         return FakeResponse(500)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "put",
+        orchestrator_main,
+        "put_with_retry",
         fake_put
     )
 
@@ -358,8 +358,8 @@ def test_inventory_failure_cancel_failure(monkeypatch):
             return FakeResponse(500)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
@@ -404,8 +404,8 @@ def test_payment_failure_release_failure(monkeypatch):
             return FakeResponse(500)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
@@ -457,8 +457,8 @@ def test_payment_failure_cancel_failure(monkeypatch):
             return FakeResponse(500)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
@@ -509,14 +509,14 @@ def test_status_update_failure_refund_failure(monkeypatch):
         return FakeResponse(500)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "put",
+        orchestrator_main,
+        "put_with_retry",
         fake_put
     )
 
@@ -570,14 +570,14 @@ def test_status_update_failure_release_failure(monkeypatch):
         return FakeResponse(500)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "put",
+        orchestrator_main,
+        "put_with_retry",
         fake_put
     )
 
@@ -637,14 +637,14 @@ def test_status_update_failure_cancel_failure(monkeypatch):
         return FakeResponse(500)
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "post",
+        orchestrator_main,
+        "post_with_retry",
         fake_post
     )
 
     monkeypatch.setattr(
-        orchestrator_main.httpx,
-        "put",
+        orchestrator_main,
+        "put_with_retry",
         fake_put
     )
 
@@ -669,4 +669,3 @@ def test_status_update_failure_cancel_failure(monkeypatch):
 
     assert saga["status"] == "COMPENSATION_FAILED"
     assert saga["current_step"] == "ORDER_CANCEL_FAILED"
-

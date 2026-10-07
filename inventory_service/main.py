@@ -42,23 +42,13 @@ def reserve_product(
     request: schemas.ReserveRequest,
     db: Session = Depends(get_db)
 ):
-    #da li je vec rezervisan od iste sage
-    existing_reservation = db.query(models.Reservation).filter(
-        models.Reservation.saga_id == request.saga_id
-    ).first()
-
-    # Ako jeste, ne ponovo
-    if existing_reservation:
-        return {
-            "message": "Product already reserved",
-            "product_id": existing_reservation.product_id,
-            "quantity": existing_reservation.quantity
-        }
-
-    # Pronadji proizvod
-    product = db.query(models.Product).filter(
-        models.Product.id == request.product_id
-    ).first()
+    # Zakljucavamo proizvod
+    product = (
+        db.query(models.Product)
+        .filter(models.Product.id == request.product_id)
+        .with_for_update()
+        .first()
+    )
 
     if product is None:
         raise HTTPException(
@@ -66,13 +56,32 @@ def reserve_product(
             detail="Product not found"
         )
 
+    # Proveravamp da li je Saga vec rezervisala proizvod
+    existing_reservation = db.query(models.Reservation).filter(
+        models.Reservation.saga_id == request.saga_id
+    ).first()
+
+    if existing_reservation:
+        if existing_reservation.status == "RELEASED":
+            raise HTTPException(
+                status_code=409,
+                detail="Reservation already released"
+            )
+
+        return {
+            "message": "Product already reserved",
+            "product_id": existing_reservation.product_id,
+            "quantity": existing_reservation.quantity
+        }
+
+    # Proveramo dostupnu kolicinu
     if product.quantity < request.quantity:
         raise HTTPException(
             status_code=400,
             detail="Not enough products in stock"
         )
 
-    # Smanji stanje
+    # Smanjujemo stanje proizvoda
     product.quantity -= request.quantity
 
     # Kreiramo rezervaciju
@@ -98,7 +107,7 @@ def release_product(
     request: schemas.ReleaseRequest,
     db: Session = Depends(get_db)
 ):
-    # Pronadji rezervaciju preko saga_id
+    # Treba da pronadjemo rezervaciju preko saga_id
     reservation = db.query(models.Reservation).filter(
         models.Reservation.saga_id == request.saga_id
     ).first()
@@ -109,16 +118,13 @@ def release_product(
             detail="Reservation not found"
         )
 
-    # Ako je vec oslobodjena, ne vracaj quantity ponovo
-    if reservation.status == "RELEASED":
-        return {
-            "message": "Product already released",
-            "product_id": reservation.product_id
-        }
-
-    product = db.query(models.Product).filter(
-        models.Product.id == reservation.product_id
-    ).first()
+    # Zakljucavanje proizvoda
+    product = (
+        db.query(models.Product)
+        .filter(models.Product.id == reservation.product_id)
+        .with_for_update()
+        .first()
+    )
 
     if product is None:
         raise HTTPException(
@@ -126,10 +132,25 @@ def release_product(
             detail="Product not found"
         )
 
-    # Vrati tacno onu kolicinu koja je bila rezervisana
+    # Zakljucavanje rezervacije i ponovo status proveravamo
+    reservation = (
+        db.query(models.Reservation)
+        .filter(models.Reservation.saga_id == request.saga_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+
+    if reservation.status == "RELEASED":
+        return {
+            "message": "Product already released",
+            "product_id": reservation.product_id
+        }
+
+    # Azuriramo
     product.quantity += reservation.quantity
 
-    # Oznaci rezervaciju kao oslobodjenu
+    # Oznacavamo rezervaciju kao oslobodjenu
     reservation.status = "RELEASED"
 
     db.commit()

@@ -55,16 +55,13 @@ def create_payment(
     payment: schemas.PaymentCreate,
     db: Session = Depends(get_db)
 ):
-    existing_payment = db.query(models.Payment).filter(
-        models.Payment.saga_id == payment.saga_id
-    ).first()
-
-    if existing_payment:
-        return existing_payment
-
-    account = db.query(models.Account).filter(
-        models.Account.id == payment.account_id
-    ).first()
+    # Zakljucavamo racun
+    account = (
+        db.query(models.Account)
+        .filter(models.Account.id == payment.account_id)
+        .with_for_update()
+        .first()
+    )
 
     if account is None:
         raise HTTPException(
@@ -72,16 +69,30 @@ def create_payment(
             detail="Account not found"
         )
 
+    # Proveravamo da li je Saga vec izvrsila placanje
+    existing_payment = db.query(models.Payment).filter(
+        models.Payment.saga_id == payment.saga_id
+    ).first()
+
+    if existing_payment:
+        if existing_payment.status == "REFUNDED":
+            raise HTTPException(
+                status_code=409,
+                detail="Payment already refunded"
+            )
+
+        return existing_payment
+
     if account.balance < payment.amount:
         raise HTTPException(
             status_code=400,
             detail="Insufficient funds"
         )
 
-    # Skini novac
+    # Skidamo novac
     account.balance -= payment.amount
 
-    # Zapamti da je ova Saga izvrsila placanje
+    # Kreiramo zapis o placanju
     new_payment = models.Payment(
         saga_id=payment.saga_id,
         order_id=payment.order_id,
@@ -107,6 +118,7 @@ def refund_payment(
     request: schemas.PaymentRefund,
     db: Session = Depends(get_db)
 ):
+    # Pronalazimo placanje
     payment = db.query(models.Payment).filter(
         models.Payment.saga_id == request.saga_id
     ).first()
@@ -117,12 +129,13 @@ def refund_payment(
             detail="Payment not found"
         )
 
-    if payment.status == "REFUNDED":
-        return payment
-
-    account = db.query(models.Account).filter(
-        models.Account.id == payment.account_id
-    ).first()
+    # Zakljucavamo racun
+    account = (
+        db.query(models.Account)
+        .filter(models.Account.id == payment.account_id)
+        .with_for_update()
+        .first()
+    )
 
     if account is None:
         raise HTTPException(
@@ -130,8 +143,23 @@ def refund_payment(
             detail="Account not found"
         )
 
+    # Zakljucavamo placanje i ponovo ucitaj status
+    payment = (
+        db.query(models.Payment)
+        .filter(models.Payment.saga_id == request.saga_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+
+    # Ako je novac vec vracen, ne vracaj ponovo
+    if payment.status == "REFUNDED":
+        return payment
+
+    # Vracamo novac
     account.balance += payment.amount
 
+    # Oznacavamo placanje kao refundirano
     payment.status = "REFUNDED"
 
     db.commit()
