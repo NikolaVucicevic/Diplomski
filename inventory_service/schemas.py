@@ -24,3 +24,13 @@ class ReserveRequest(BaseModel):
 
 class ReleaseRequest(BaseModel):
     saga_id: int
+
+class ReservationResponse(BaseModel):
+    id: int
+    saga_id: int
+    product_id: int
+    quantity: int
+    status: str
+
+    class Config:
+        from_attributes = True

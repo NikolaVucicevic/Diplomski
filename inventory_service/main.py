@@ -36,6 +36,10 @@ def create_product(
 def get_products(db: Session = Depends(get_db)):
     return db.query(models.Product).all()
 
+@app.get("/reservations", response_model=list[schemas.ReservationResponse])
+def get_reservations(db: Session = Depends(get_db)):
+    return db.query(models.Reservation).all()
+
 
 @app.post("/reserve")
 def reserve_product(
@@ -160,4 +164,76 @@ def release_product(
         "message": "Product released",
         "product_id": product.id,
         "quantity": product.quantity
+    }
+
+@app.delete("/products/{product_id}")
+def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+    product = db.query(models.Product).filter(
+        models.Product.id == product_id
+    ).first()
+
+    if product is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    db.delete(product)
+    db.commit()
+
+    return {
+        "message": "Product deleted",
+        "product_id": product_id
+    }
+
+@app.delete("/reservations/{saga_id}")
+def delete_reservation(
+    saga_id: int,
+    db: Session = Depends(get_db)
+):
+    reservation = db.query(models.Reservation).filter(
+        models.Reservation.saga_id == saga_id
+    ).first()
+
+    if reservation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Reservation not found"
+        )
+
+    db.delete(reservation)
+    db.commit()
+
+    return {
+        "message": "Reservation deleted",
+        "saga_id": saga_id
+    }
+
+@app.delete("/test-data/product/{product_id}")
+def delete_test_product_data(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+    # Brisemo sve rezervacije koje pripadaju ovom proizvodu
+    db.query(models.Reservation).filter(
+        models.Reservation.product_id == product_id
+    ).delete(synchronize_session=False)
+
+    # Pronalazimo proizvod
+    product = db.query(models.Product).filter(
+        models.Product.id == product_id
+    ).first()
+
+    # Brisemo proizvod ako postoji
+    if product is not None:
+        db.delete(product)
+
+    db.commit()
+
+    return {
+        "message": "Test data deleted",
+        "product_id": product_id
     }
