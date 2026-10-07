@@ -28,7 +28,8 @@ def post_with_retry(url, json, max_retries=3, timeout=2.0):
                 time.sleep(0.5)
                 continue
 
-            raise
+            # Svi retry pokusaji su iscrpljeni
+            return httpx.Response(status_code=503)
 
 
 def put_with_retry(url, json, max_retries=3, timeout=2.0):
@@ -57,4 +58,5 @@ def put_with_retry(url, json, max_retries=3, timeout=2.0):
                 time.sleep(0.5)
                 continue
 
-            raise
+            # Svi retry pokusaji su iscrpljeni
+            return httpx.Response(status_code=503)
