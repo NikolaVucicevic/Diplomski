@@ -166,3 +166,28 @@ def refund_payment(
     db.refresh(payment)
 
     return payment
+
+@app.delete("/test-data/account/{account_id}")
+def delete_test_account_data(
+    account_id: int,
+    db: Session = Depends(get_db)
+):
+    # Brisemo sva placanja vezana za racun
+    db.query(models.Payment).filter(
+        models.Payment.account_id == account_id
+    ).delete(synchronize_session=False)
+
+    # Brisemo racun
+    account = db.query(models.Account).filter(
+        models.Account.id == account_id
+    ).first()
+
+    if account is not None:
+        db.delete(account)
+
+    db.commit()
+
+    return {
+        "message": "Test data deleted",
+        "account_id": account_id
+    }

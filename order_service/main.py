@@ -21,7 +21,7 @@ def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db)
 ):
-    # Proveri da li je ova Saga vec kreirala order
+    # Proveravamo da li je ova Saga vec kreirala order
     existing_order = db.query(models.Order).filter(
         models.Order.saga_id == order.saga_id
     ).first()
@@ -30,7 +30,7 @@ def create_order(
     if existing_order:
         return existing_order
 
-    # Ako nije, kreiraj novi order
+    # Ako nije, kreiramo novi order
     new_order = models.Order(
         saga_id=order.saga_id,
         product_id=order.product_id,
@@ -47,8 +47,7 @@ def create_order(
     except IntegrityError:
         db.rollback()
 
-        # Moguce je da je drugi konkurentni zahtev
-        # u medjuvremenu kreirao order za istu Sagu
+        # Moguce je da je drugi konkurentni zahtev kreirao istu Sagu
         existing_order = db.query(models.Order).filter(
             models.Order.saga_id == order.saga_id
         ).first()
@@ -57,7 +56,7 @@ def create_order(
             return existing_order
 
         # Ako IntegrityError nije nastao zbog duplog saga_id,
-        # prosledi originalnu gresku
+        # prosledjujemo originalnu gresku
         raise
 
     db.refresh(new_order)
@@ -78,7 +77,7 @@ def update_order_status(
     order_update: schemas.OrderUpdate,
     db: Session = Depends(get_db)
 ):
-    # Zakljucaj order dok se menja njegov status
+    # Zakljuvamo order dok se menja njegov status
     order = (
         db.query(models.Order)
         .filter(models.Order.id == order_update.id)
@@ -154,3 +153,27 @@ def cancel_order(
     db.refresh(order)
 
     return order
+
+
+@app.delete("/test-data/order/{order_id}")
+def delete_test_order(
+    order_id: int,
+    db: Session = Depends(get_db)
+):
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id
+    ).first()
+
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
+    db.delete(order)
+    db.commit()
+
+    return {
+        "message": "Test order deleted",
+        "order_id": order_id
+    }
