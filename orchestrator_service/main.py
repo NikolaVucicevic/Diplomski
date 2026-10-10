@@ -278,3 +278,27 @@ def start_saga(
         "order_id": order_id,
         "status": "PAID"
     }
+
+
+@app.delete("/test-data/saga/{saga_id}")
+def delete_test_saga(
+    saga_id: int,
+    db: Session = Depends(get_db)
+):
+    saga = db.query(models.Saga).filter(
+        models.Saga.id == saga_id
+    ).first()
+
+    if not saga:
+        raise HTTPException(
+            status_code=404,
+            detail="Saga not found"
+        )
+
+    db.delete(saga)
+    db.commit()
+
+    return {
+        "message": "Test saga deleted",
+        "saga_id": saga_id
+    }
