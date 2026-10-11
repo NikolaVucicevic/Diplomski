@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,12 @@ from .http_client import post_with_retry, put_with_retry
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Saga Orchestrator Service")
+
+
+# Adrese mikroservisa
+ORDER_SERVICE_URL = "http://127.0.0.1:8001"
+INVENTORY_SERVICE_URL = "http://127.0.0.1:8002"
+PAYMENT_SERVICE_URL = "http://127.0.0.1:8003"
 
 
 @app.get("/")
@@ -42,7 +49,7 @@ def start_saga(
 
     # 1. Kreiramo order
     order_response = post_with_retry(
-        "http://localhost:8001/create",
+        f"{ORDER_SERVICE_URL}/create",
         json={
             "saga_id": saga_id,
             "product_id": request.product_id,
@@ -72,7 +79,7 @@ def start_saga(
 
     # 2. Rezervisemo proizvod
     inventory_response = post_with_retry(
-        "http://localhost:8002/reserve",
+        f"{INVENTORY_SERVICE_URL}/reserve",
         json={
             "saga_id": saga_id,
             "product_id": request.product_id,
@@ -88,7 +95,7 @@ def start_saga(
 
         # Kompenzacija za create order
         cancel_response = post_with_retry(
-            "http://localhost:8001/cancel",
+            f"{ORDER_SERVICE_URL}/cancel",
             json={
                 "order_id": order_id
             }
@@ -118,7 +125,7 @@ def start_saga(
 
     # 3. Izvrsavamo placanje
     payment_response = post_with_retry(
-        "http://localhost:8003/pay",
+        f"{PAYMENT_SERVICE_URL}/pay",
         json={
             "saga_id": saga_id,
             "order_id": order_id,
@@ -135,7 +142,7 @@ def start_saga(
 
         # Kompenzacija za reserve
         release_response = post_with_retry(
-            "http://localhost:8002/release",
+            f"{INVENTORY_SERVICE_URL}/release",
             json={
                 "saga_id": saga_id
             }
@@ -156,7 +163,7 @@ def start_saga(
 
         # Kompenzacija za create order
         cancel_response = post_with_retry(
-            "http://localhost:8001/cancel",
+            f"{ORDER_SERVICE_URL}/cancel",
             json={
                 "order_id": order_id
             }
@@ -186,7 +193,7 @@ def start_saga(
 
     # 4. Menjamo status ordera na PAID
     status_response = put_with_retry(
-        "http://localhost:8001/orders/status",
+        f"{ORDER_SERVICE_URL}/orders/status",
         json={
             "id": order_id,
             "status": "PAID"
@@ -201,7 +208,7 @@ def start_saga(
 
         # Kompenzacija za payment
         refund_response = post_with_retry(
-            "http://localhost:8003/refund",
+            f"{PAYMENT_SERVICE_URL}/refund",
             json={
                 "saga_id": saga_id
             }
@@ -222,7 +229,7 @@ def start_saga(
 
         # Kompenzacija za reserve
         release_response = post_with_retry(
-            "http://localhost:8002/release",
+            f"{INVENTORY_SERVICE_URL}/release",
             json={
                 "saga_id": saga_id
             }
@@ -243,7 +250,7 @@ def start_saga(
 
         # Kompenzacija za create order
         cancel_response = post_with_retry(
-            "http://localhost:8001/cancel",
+            f"{ORDER_SERVICE_URL}/cancel",
             json={
                 "order_id": order_id
             }

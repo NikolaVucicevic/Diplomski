@@ -7,6 +7,10 @@ from orchestrator_service.main import app
 from orchestrator_service.database import Base, get_db
 import orchestrator_service.main as orchestrator_main
 
+ORDER_SERVICE_URL = "http://127.0.0.1:8001"
+INVENTORY_SERVICE_URL = "http://127.0.0.1:8002"
+PAYMENT_SERVICE_URL = "http://127.0.0.1:8003"
+
 
 SQLALCHEMY_DATABASE_URL = "sqlite://"
 
@@ -53,7 +57,7 @@ def test_saga_success(monkeypatch):
 
     def fake_post(url, json):
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -62,14 +66,14 @@ def test_saga_success(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/pay":
+        if url == f"{PAYMENT_SERVICE_URL}/pay":
             return FakeResponse(200)
 
     def fake_put(url, json):
-        if url == "http://localhost:8001/orders/status":
+        if url == f"{ORDER_SERVICE_URL}/orders/status":
             return FakeResponse(200)
 
     monkeypatch.setattr(
@@ -113,7 +117,7 @@ def test_saga_success(monkeypatch):
 def test_order_creation_failure(monkeypatch):
 
     def fake_post(url, json):
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(500)
 
     monkeypatch.setattr(
@@ -148,7 +152,7 @@ def test_inventory_failure(monkeypatch):
     def fake_post(url, json):
         calls.append(url)
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -157,10 +161,10 @@ def test_inventory_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(400)
 
-        if url == "http://localhost:8001/cancel":
+        if url == f"{ORDER_SERVICE_URL}/cancel":
             return FakeResponse(200)
 
     monkeypatch.setattr(
@@ -181,7 +185,7 @@ def test_inventory_failure(monkeypatch):
 
     assert response.status_code == 400
 
-    assert "http://localhost:8001/cancel" in calls
+    assert f"{ORDER_SERVICE_URL}/cancel" in calls
 
     sagas = client.get("/sagas").json()
     saga = sagas[-1]
@@ -196,7 +200,7 @@ def test_payment_failure(monkeypatch):
     def fake_post(url, json):
         calls.append(url)
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -205,16 +209,16 @@ def test_payment_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/pay":
+        if url == f"{PAYMENT_SERVICE_URL}/pay":
             return FakeResponse(400)
 
-        if url == "http://localhost:8002/release":
+        if url == f"{INVENTORY_SERVICE_URL}/release":
             return FakeResponse(200)
 
-        if url == "http://localhost:8001/cancel":
+        if url == f"{ORDER_SERVICE_URL}/cancel":
             return FakeResponse(200)
 
     monkeypatch.setattr(
@@ -235,17 +239,17 @@ def test_payment_failure(monkeypatch):
 
     assert response.status_code == 400
 
-    assert "http://localhost:8003/pay" in calls
-    assert "http://localhost:8002/release" in calls
-    assert "http://localhost:8001/cancel" in calls
+    assert f"{PAYMENT_SERVICE_URL}/pay" in calls
+    assert f"{INVENTORY_SERVICE_URL}/release" in calls
+    assert f"{ORDER_SERVICE_URL}/cancel" in calls
 
     # Proveri i redosled kompenzacija
     release_index = calls.index(
-        "http://localhost:8002/release"
+        f"{INVENTORY_SERVICE_URL}/release"
     )
 
     cancel_index = calls.index(
-        "http://localhost:8001/cancel"
+        f"{ORDER_SERVICE_URL}/cancel"
     )
 
     assert release_index < cancel_index
@@ -263,7 +267,7 @@ def test_status_update_failure(monkeypatch):
     def fake_post(url, json):
         calls.append(url)
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -272,19 +276,19 @@ def test_status_update_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/pay":
+        if url == f"{PAYMENT_SERVICE_URL}/pay":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/refund":
+        if url == f"{PAYMENT_SERVICE_URL}/refund":
             return FakeResponse(200)
 
-        if url == "http://localhost:8002/release":
+        if url == f"{INVENTORY_SERVICE_URL}/release":
             return FakeResponse(200)
 
-        if url == "http://localhost:8001/cancel":
+        if url == f"{ORDER_SERVICE_URL}/cancel":
             return FakeResponse(200)
 
     def fake_put(url, json):
@@ -314,20 +318,20 @@ def test_status_update_failure(monkeypatch):
 
     assert response.status_code == 400
 
-    assert "http://localhost:8003/refund" in calls
-    assert "http://localhost:8002/release" in calls
-    assert "http://localhost:8001/cancel" in calls
+    assert f"{PAYMENT_SERVICE_URL}/refund" in calls
+    assert f"{INVENTORY_SERVICE_URL}/release" in calls
+    assert f"{ORDER_SERVICE_URL}/cancel" in calls
 
     refund_index = calls.index(
-        "http://localhost:8003/refund"
+        f"{PAYMENT_SERVICE_URL}/refund"
     )
 
     release_index = calls.index(
-        "http://localhost:8002/release"
+        f"{INVENTORY_SERVICE_URL}/release"
     )
 
     cancel_index = calls.index(
-        "http://localhost:8001/cancel"
+        f"{ORDER_SERVICE_URL}/cancel"
     )
 
     assert refund_index < release_index < cancel_index
@@ -342,7 +346,7 @@ def test_inventory_failure_cancel_failure(monkeypatch):
 
     def fake_post(url, json):
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -351,10 +355,10 @@ def test_inventory_failure_cancel_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(400)
 
-        if url == "http://localhost:8001/cancel":
+        if url == f"{ORDER_SERVICE_URL}/cancel":
             return FakeResponse(500)
 
     monkeypatch.setattr(
@@ -385,7 +389,7 @@ def test_payment_failure_release_failure(monkeypatch):
 
     def fake_post(url, json):
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -394,13 +398,13 @@ def test_payment_failure_release_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/pay":
+        if url == f"{PAYMENT_SERVICE_URL}/pay":
             return FakeResponse(400)
 
-        if url == "http://localhost:8002/release":
+        if url == f"{INVENTORY_SERVICE_URL}/release":
             return FakeResponse(500)
 
     monkeypatch.setattr(
@@ -435,7 +439,7 @@ def test_payment_failure_cancel_failure(monkeypatch):
     def fake_post(url, json):
         calls.append(url)
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -444,16 +448,16 @@ def test_payment_failure_cancel_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/pay":
+        if url == f"{PAYMENT_SERVICE_URL}/pay":
             return FakeResponse(400)
 
-        if url == "http://localhost:8002/release":
+        if url == f"{INVENTORY_SERVICE_URL}/release":
             return FakeResponse(200)
 
-        if url == "http://localhost:8001/cancel":
+        if url == f"{ORDER_SERVICE_URL}/cancel":
             return FakeResponse(500)
 
     monkeypatch.setattr(
@@ -474,8 +478,8 @@ def test_payment_failure_cancel_failure(monkeypatch):
 
     assert response.status_code == 500
 
-    assert "http://localhost:8002/release" in calls
-    assert "http://localhost:8001/cancel" in calls
+    assert f"{INVENTORY_SERVICE_URL}/release" in calls
+    assert f"{ORDER_SERVICE_URL}/cancel" in calls
 
     sagas = client.get("/sagas").json()
     saga = sagas[-1]
@@ -487,7 +491,7 @@ def test_status_update_failure_refund_failure(monkeypatch):
 
     def fake_post(url, json):
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -496,13 +500,13 @@ def test_status_update_failure_refund_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/pay":
+        if url == f"{PAYMENT_SERVICE_URL}/pay":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/refund":
+        if url == f"{PAYMENT_SERVICE_URL}/refund":
             return FakeResponse(500)
 
     def fake_put(url, json):
@@ -545,7 +549,7 @@ def test_status_update_failure_release_failure(monkeypatch):
     def fake_post(url, json):
         calls.append(url)
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -554,16 +558,16 @@ def test_status_update_failure_release_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/pay":
+        if url == f"{PAYMENT_SERVICE_URL}/pay":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/refund":
+        if url == f"{PAYMENT_SERVICE_URL}/refund":
             return FakeResponse(200)
 
-        if url == "http://localhost:8002/release":
+        if url == f"{INVENTORY_SERVICE_URL}/release":
             return FakeResponse(500)
 
     def fake_put(url, json):
@@ -593,8 +597,8 @@ def test_status_update_failure_release_failure(monkeypatch):
 
     assert response.status_code == 500
 
-    assert "http://localhost:8003/refund" in calls
-    assert "http://localhost:8002/release" in calls
+    assert f"{PAYMENT_SERVICE_URL}/refund" in calls
+    assert f"{INVENTORY_SERVICE_URL}/release" in calls
 
     sagas = client.get("/sagas").json()
     saga = sagas[-1]
@@ -609,7 +613,7 @@ def test_status_update_failure_cancel_failure(monkeypatch):
     def fake_post(url, json):
         calls.append(url)
 
-        if url == "http://localhost:8001/create":
+        if url == f"{ORDER_SERVICE_URL}/create":
             return FakeResponse(
                 200,
                 {
@@ -618,19 +622,19 @@ def test_status_update_failure_cancel_failure(monkeypatch):
                 }
             )
 
-        if url == "http://localhost:8002/reserve":
+        if url == f"{INVENTORY_SERVICE_URL}/reserve":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/pay":
+        if url == f"{PAYMENT_SERVICE_URL}/pay":
             return FakeResponse(200)
 
-        if url == "http://localhost:8003/refund":
+        if url == f"{PAYMENT_SERVICE_URL}/refund":
             return FakeResponse(200)
 
-        if url == "http://localhost:8002/release":
+        if url == f"{INVENTORY_SERVICE_URL}/release":
             return FakeResponse(200)
 
-        if url == "http://localhost:8001/cancel":
+        if url == f"{ORDER_SERVICE_URL}/cancel":
             return FakeResponse(500)
 
     def fake_put(url, json):
@@ -660,9 +664,9 @@ def test_status_update_failure_cancel_failure(monkeypatch):
 
     assert response.status_code == 500
 
-    assert "http://localhost:8003/refund" in calls
-    assert "http://localhost:8002/release" in calls
-    assert "http://localhost:8001/cancel" in calls
+    assert f"{PAYMENT_SERVICE_URL}/refund" in calls
+    assert f"{INVENTORY_SERVICE_URL}/release" in calls
+    assert f"{ORDER_SERVICE_URL}/cancel" in calls
 
     sagas = client.get("/sagas").json()
     saga = sagas[-1]
